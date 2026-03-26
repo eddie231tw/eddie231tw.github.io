@@ -10,7 +10,7 @@
     <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
 
     <style>
-      html, body { margin: 0; padding: 0; background-color: #0a0f19; overflow: hidden; font-family: 'Courier New', monospace; }
+      html, body { margin: 0; padding: 0; background-color: #1a1025; overflow: hidden; font-family: 'Georgia', serif; }
       
       /* UI 控制群組 */
       .nav-group { position: fixed; top: 20px; left: 20px; z-index: 2000; display: flex; gap: 10px; }
@@ -21,14 +21,14 @@
         transition: all 0.3s; cursor: pointer;
       }
       
-      #back-btn { background: rgba(0, 255, 255, 0.05); border: 1px solid rgba(0, 255, 255, 0.2); color: #0ff; }
-      #reload-btn { background: rgba(255, 50, 50, 0.05); border: 1px solid rgba(255, 50, 50, 0.3); color: #f33; }
+      #back-btn { background: rgba(232, 162, 210, 0.05); border: 1px solid rgba(232, 162, 210, 0.2); color: #e8a2d2; }
+      #reload-btn { background: rgba(255, 180, 180, 0.05); border: 1px solid rgba(255, 180, 180, 0.3); color: #f99; }
       
       .nav-btn:hover { background: rgba(255, 255, 255, 0.15); box-shadow: 0 0 10px currentColor; }
 
-      #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0f19; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; color: #0ff; }
-      .start-btn { background: transparent; border: 1px solid #0ff; color: #0ff; padding: 12px 35px; font-size: 1.1em; cursor: pointer; margin-top: 20px; letter-spacing: 4px; }
-      #status-log { position: fixed; bottom: 10px; left: 10px; color: rgba(0, 255, 255, 0.4); font-size: 10px; z-index: 2000; }
+      #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1025; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; color: #e8a2d2; font-family: 'Georgia', serif; }
+      .start-btn { background: transparent; border: 1px solid #e8a2d2; color: #e8a2d2; padding: 12px 35px; font-size: 1.1em; cursor: pointer; margin-top: 20px; letter-spacing: 4px; border-radius: 6px; }
+      #status-log { position: fixed; bottom: 10px; left: 10px; color: rgba(232, 162, 210, 0.6); font-size: 11px; z-index: 2000; font-family: 'Georgia', serif; }
     </style>
   </head>
   <body>
@@ -49,8 +49,9 @@
       let video, handPose, hands = [];
       let isReady = false;
       let smoothedAngle = [0, 0], lastTickAngle = [0, 0], smoothedPos = [{x:0, y:0}, {x:0, y:0}];
-      let mainColor, colors = ['#00ffff', '#ff00ff', '#ffff00'], colorIdx = 0;
+      let mainColor, colors = ['#e8a2d2', '#a2bce8', '#e8d2a2'], colorIdx = 0;
       let glitchTimer = 0, osc, envelope, linkOsc;
+      let ptColors = []; // 用來存21個點的隨機顏色
       let modelCheckTimer = 0;
 
       let buttons = [
@@ -76,7 +77,12 @@
           updateLog("MODEL ENGINE READY");
         });
         angleMode(DEGREES);
-        textFont('Courier New');
+        textFont('Georgia');
+        
+        // 產生21個隨機夢幻的顏色
+        for(let i=0; i<21; i++) {
+          ptColors.push(color(random(150, 255), random(150, 255), random(150, 255)));
+        }
       }
 
       function updateLog(msg) {
@@ -114,7 +120,8 @@
       }
 
       function draw() {
-        background(10, 15, 25);
+        // 古典夢幻星空紫背景
+        background(25, 15, 35);
         if (!isReady) return;
 
         // 穩定性監控：如果 3 秒內沒有偵測到任何東西（包含偵測空的結果），嘗試重啟偵測
@@ -144,7 +151,7 @@
 
             checkButtons(tx, ty);
             drawSciFiSkeleton(hand, gx, gy);
-            drawFingertips(hand, gx, gy);
+            drawKeypoints(hand, gx, gy);
             drawHoloDial(hand, i, gx, gy);
             drawCursor(tx, ty);
           }
@@ -222,18 +229,48 @@
         let connections = handPose.getConnections();
         for (let i = 0; i < connections.length; i++) {
           let a = connections[i][0], b = connections[i][1];
-          line(map(hand.keypoints[a].x, 0, 640, 0, width) + gx, map(hand.keypoints[a].y, 0, 480, 0, height) + gy,
-               map(hand.keypoints[b].x, 0, 640, 0, width) + gx, map(hand.keypoints[b].y, 0, 480, 0, height) + gy);
+          let x1 = map(hand.keypoints[a].x, 0, 640, 0, width) + gx;
+          let y1 = map(hand.keypoints[a].y, 0, 480, 0, height) + gy;
+          let x2 = map(hand.keypoints[b].x, 0, 640, 0, width) + gx;
+          let y2 = map(hand.keypoints[b].y, 0, 480, 0, height) + gy;
+          
+          stroke(red(mainColor), green(mainColor), blue(mainColor), 80);
+          strokeWeight(2);
+          line(x1, y1, x2, y2);
+          
+          // 產生動態魔法火花
+          if (random() > 0.2) { // 80%機率出現火花
+            let sparkAmt = int(random(1, 4)); // 產生1~3顆火花
+            for (let j = 0; j < sparkAmt; j++) {
+              let t = random(); // 隨機位置比例 0~1
+              let sx = lerp(x1, x2, t) + random(-8, 8); // 加上偏移量，讓火花飄散
+              let sy = lerp(y1, y2, t) + random(-8, 8);
+              
+              noStroke();
+              fill(255, 255, random(200, 255), random(150, 255)); // 帶有一點亮白色與淡黃色的火花
+              circle(sx, sy, random(2, 5)); // 隨機大小的火花點
+            }
+          }
         }
       }
 
-      function drawFingertips(hand, gx, gy) {
-        [4, 8, 12, 16, 20].forEach(idx => {
+      function drawKeypoints(hand, gx, gy) {
+        // 繪製手上的 21 個點，使用陣列裡的隨機夢幻配色
+        for(let idx = 0; idx < hand.keypoints.length; idx++) {
           let k = hand.keypoints[idx];
-          let x = map(k.x, 0, 640, 0, width) + gx, y = map(k.y, 0, 480, 0, height) + gy;
-          noFill(); stroke(255, 180); circle(x, y, 12);
-          fill(255, 150); textSize(9); text(`ID:${idx}`, x+15, y-10);
-        });
+          let x = map(k.x, 0, 640, 0, width) + gx;
+          let y = map(k.y, 0, 480, 0, height) + gy;
+          
+          // 加上防呆機制避免超出陣列
+          let colorIndex = idx % ptColors.length;
+          fill(ptColors[colorIndex]); 
+          noStroke(); 
+          circle(x, y, 15);
+          
+          fill(255, 180); 
+          textSize(10); 
+          text(`ID:${idx}`, x+15, y-10);
+        }
       }
 
       function drawVirtualButtons(gx, gy) {
